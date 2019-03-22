@@ -4,7 +4,6 @@
 // http://www.boost.org/LICENSE_1_0.txt)
 #ifndef TEST_CLASS_DWA2002326_HPP
 # define TEST_CLASS_DWA2002326_HPP
-# include <boost/detail/lightweight_test.hpp>
 
 template <int n = 0>
 struct test_class
