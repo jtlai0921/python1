@@ -1,118 +1,62 @@
+#==============================================================================
+#   Copyright (c) 2016-2019 Nikita Kniazev
 #
-# Copyright (c) 2016 Stefan Seefeld
-# All rights reserved.
-#
-# Distributed under the Boost Software License, Version 1.0.
-# (See accompanying file LICENSE_1_0.txt or copy at
-# http://www.boost.org/LICENSE_1_0.txt)
-
-sudo: required
-dist: trusty
+#   Use, modification and distribution is subject to the Boost Software
+#   License, Version 1.0. (See accompanying file LICENSE_1_0.txt or copy at
+#   http://www.boost.org/LICENSE_1_0.txt)
+#==============================================================================
 
 language: cpp
 
-env:
-  global:
-    - secure: BRNUkxN3p8f+uYKWC3Hr0VPqZA0PxbWr1DJlcI4hbiZtzKhMCWjDmd9UW9CzzexqeOxpd+9s0G87qvOur+wMSVxugDxtTesZrh1czXHeSVxgQrYD783XJtQJ9aYypbChkiboRD6Xpmbq7itwMuHBJMFtCuDxMynpU1jWwkyTf2Y=
+addon_shortcuts:
+  clang-7: &clang-7
+    apt:
+      sources:
+        - llvm-toolchain-xenial-7
+        - ubuntu-toolchain-r-test
+      packages:
+        - clang-7
+        - libstdc++-8-dev
+        - python-numpy
+        - python3-dev
+        - python3-numpy
+
+  gcc-8: &gcc-8
+    apt:
+      sources:
+        - ubuntu-toolchain-r-test
+      packages:
+        - g++-8
+        - python-numpy
+        - python3-dev
+        - python3-numpy
+
+os: linux
+dist: xenial
 
 matrix:
   include:
-    - os: linux
-      env: CXX=g++ PYTHON=python CXXFLAGS=-std=c++98
-    - os: linux
-      env: CXX=g++ PYTHON=python CXXFLAGS=-std=c++11
-    - os: linux
-      env: CXX=g++ PYTHON=python3 CXXFLAGS=-std=c++98
-    - os: linux
-      env: CXX=g++ PYTHON=python3 CXXFLAGS=-std=c++11
-    - os: linux
-      env: CXX=clang++ PYTHON=python3 CXXFLAGS=-std=c++98
-    - os: linux
-      env: CXX=clang++ PYTHON=python3 CXXFLAGS=-std=c++11
-    - os: osx
-      env: CXX=clang++ PYTHON=python CXXFLAGS=-std=c++11
-    - env: PYTHON=python DOC=1
-  allow_failures:
-    - os: osx
+    - { env: 'STD=17,14  PYTHON=python3',  compiler: clang-7, addons: *clang-7 }
+    - { env: 'STD=17,14  PYTHON=python3', compiler: gcc-8, addons: *gcc-8 }
+    - { env: 'STD=11,03  PYTHON=python3',  compiler: clang-7, addons: *clang-7 }
+    - { env: 'STD=11,03  PYTHON=python3', compiler: gcc-8, addons: *gcc-8 }
+    - { env: 'STD=17,14  PYTHON=python',  compiler: clang-7, addons: *clang-7 }
+    - { env: 'STD=17,14  PYTHON=python', compiler: gcc-8, addons: *gcc-8 }
+    - { env: 'STD=11,03  PYTHON=python',  compiler: clang-7, addons: *clang-7 }
+    - { env: 'STD=11,03  PYTHON=python', compiler: gcc-8, addons: *gcc-8 }
 
-addons:
-  apt:
-    sources:
-    - ubuntu-toolchain-r-test
-    packages:
-    - gcc-4.8
-    - g++-4.8
-    - clang
-    - python-numpy
-    - python-sphinx
-    - python3-dev
-    - python3-numpy
-    - libboost-all-dev
-    - xsltproc
-    - docbook-xsl
-    - python-docutils
-
-
-cache:
-  directories:
-  - $HOME/Boost
-
-before_install:
-  # The Trusty image has several Python versions pre-installed compiled with
-  # conflicting UCS2 and UCS4 unicode. Modify the PATH to skip the TravisCI python.
-  # See https://github.com/travis-ci/travis-ci/issues/4948 for details.
-  - export PATH=$(echo $PATH | tr ':' "\n" | sed '/\/opt\/python/d' | tr "\n" ":" | sed "s|::|:|g")
 
 install:
-  # Install our own version of Boost (the subset we need) as the system version is
-  # too old (for C++11 support).
-  - |
-     if [ ! -d $HOME/Boost/tools/boostbook ]; then
-       echo "rebuilding Boost prerequisites."
-       wget https://sourceforge.net/projects/boost/files/boost/1.66.0/boost_1_66_0.tar.gz/download
-       tar xf download
-       pushd boost_1_66_0
-       ./bootstrap.sh
-       ./b2 tools/bcp
-       mkdir -p $HOME/Boost
-       # Install Boost.Python prerequisites, but not Boost.Python itself.
-       dist/bin/bcp python tools/boostbook tools/quickbook $HOME/Boost &> /dev/null
-       rm -rf $HOME/Boost/boost/python*
-       popd
-     else
-       echo "using cached Boost prerequisites."
-     fi
-     # Install Faber, the build tool.
-     date=2018-04-08
-     wget https://github.com/stefanseefeld/faber/archive/snapshot/$date.tar.gz
-     tar xf $date.tar.gz
-     pushd faber-snapshot-$date
-     #wget https://github.com/stefanseefeld/faber/archive/release/0.2.tar.gz
-     #tar xf 0.2.tar.gz
-     #pushd faber-release-0.2
-     sudo python setup.py install
-     popd
-
-before_script:
-- sed -e "s/\$PYTHON/$PYTHON/g" .ci/faber > ~/.faber
-- $PYTHON --version
-- faber -h
-- ls -l $HOME/Boost
+  - BOOST_BRANCH=develop && [ "$TRAVIS_BRANCH" == "master" ] && BOOST_BRANCH=master || true
+  - cd ..
+  - git clone -b $BOOST_BRANCH --depth 1 https://github.com/boostorg/boost.git boost-root
+  - cd boost-root
+  - rm -rf libs/python
+  - mv $TRAVIS_BUILD_DIR libs/python
+  - ln -s libs/python $TRAVIS_BUILD_DIR
+  - git submodule update --init tools/boostdep
+  - python tools/boostdep/depinst/depinst.py python
+  - ./bootstrap.sh
 
 script:
-- |
-   if [ "$DOC" ]; then
-     BOOST_ROOT=$HOME/Boost faber --builddir=build doc.html
-   else
-     faber --with-boost-include=$HOME/Boost --builddir=build test.report cxx.name=$CXX cxxflags=$CXXFLAGS
-   fi
-
-after_success:
-# Upload docs only when building upstream.
-- |
-   if [ "$DOC" -a \
-        "$TRAVIS_REPO_SLUG" = "boostorg/python" -a \
-        "$TRAVIS_PULL_REQUEST" = "false" ]; then
-     export GH_TOKEN
-     .ci/upload_docs.sh
-   fi
+  - ./b2 -j`nproc` libs/python/test toolset=$TRAVIS_COMPILER cxxstd=$STD
